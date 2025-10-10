@@ -1,0 +1,142 @@
+:root {
+  --spotify-green: #1db954;
+  --dark-bg: #121212;
+  --light-gray: #b3b3b3;
+  --white: #fff;
+  --card-bg: #1a1a1a; /* Ajout d'une variable pour le fond du conteneur */
+}
+
+body {
+  font-family: "Poppins", sans-serif;
+  background-color: var(--dark-bg);
+  color: var(--white);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  margin: 0;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 2rem;
+  color: var(--spotify-green);
+}
+
+/* === Conteneur principal de l'application (pour le centrage) === */
+.container {
+  width: 100%;
+  max-width: 400px; /* Limite la largeur pour une meilleure lisibilité */
+  padding: 2rem;
+  border-radius: 12px;
+  background-color: var(--card-bg); /* Utilisation de la nouvelle variable */
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  display: flex; /* Active Flexbox pour le contenu interne */
+  flex-direction: column;
+  align-items: center; /* Centre le contenu horizontalement */
+}
+
+/* === Indicateur de chargement (Loader) === */
+/* Le JS gère l'affichage/masquage de cet élément */
+.loader {
+  border: 4px solid var(--light-gray); /* Cercle extérieur gris clair */
+  border-top: 4px solid var(--spotify-green); /* Bordure colorée pour l'animation */
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin: 2rem auto;
+  display: none; /* Le JS le rend 'block' pendant la vérification */
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.player-controls {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+button {
+  background-color: transparent;
+  border: 2px solid var(--spotify-green);
+  color: var(--spotify-green);
+  padding: 0.8rem 1.2rem;
+  font-size: 1.2rem;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+button:hover {
+  background-color: var(--spotify-green);
+  color: var(--white);
+}
+
+/* === Ajustement pour les boutons de contrôle pour les rendre plus lisibles/gros === */
+.player-controls button {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  font-size: 1.5rem;
+  padding: 1rem;
+  line-height: 1;
+}
+
+.player-controls button:active {
+  transform: scale(0.95); /* Effet de clic */
+}
+
+.track-info {
+  text-align: center;
+}
+
+.album-art {
+  width: 200px;
+  height: 200px;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  margin-bottom: 1rem;
+}
+
+.track-name {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.artist-name {
+  color: var(--light-gray);
+}
+
+/* === Bouton de connexion Spotify === */
+.login-container {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.login-button {
+  display: inline-block;
+  background-color: var(--spotify-green);
+  color: var(--white);
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 50px;
+  font-size: 1rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  box-shadow: 0 4px 15px rgba(29, 185, 84, 0.4);
+}
+
+.login-button:hover {
+  background-color: #1ed760; /* ton plus clair du vert Spotify */
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(29, 185, 84, 0.6);
+}

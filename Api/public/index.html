@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="style.css" />
+    <title>Spotify Player Controller</title>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🎵 Contrôleur Spotify</h1>
+
+      <div id="loadingIndicator" class="loader"></div>
+
+      <div id="loginSection" class="login-container" hidden>
+        <a href="/login" class="login-button">Se connecter à Spotify</a>
+      </div>
+
+      <div id="playerContent" hidden>
+        <div class="track-info" id="trackInfo">
+          <img
+            class="album-art"
+            id="albumArt"
+            src="https://placehold.co/150x150/191414/ffffff?text=Album"
+            alt="Album Art"
+            hidden
+          />
+          <div class="track-name" id="trackName"></div>
+          <div class="artist-name" id="artistName"></div>
+
+          <div class="progress-container">
+            <p id="timeElapsed">0:00</p>
+            <progress id="progressBar" value="0" max="100"></progress>
+            <p id="timeTotal">0:00</p>
+          </div>
+        </div>
+
+        <div
+          class="player-controls"
+          style="
+            margin-bottom: 1rem;
+            border-top: 1px solid #333;
+            padding-top: 1rem;
+          "
+        >
+          <button onclick="playTrack('spotify:track:4KACsNJDBTlQVgW1kGIM57')">
+            🎵 Nouvelle Piste
+          </button>
+        </div>
+
+        <div id="playerSection" class="player-controls">
+          <button onclick="sendAction('previous')">⏮️</button>
+          <button onclick="sendAction('play')">▶️</button>
+          <button onclick="sendAction('pause')">⏸️</button>
+          <button onclick="sendAction('next')">⏭️</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let progressInterval = null; // Intervalle pour la barre de progression
+      let currentProgressMs = 0; // Dernière progression connue (ms)
+      let trackDurationMs = 0; // Durée totale de la piste (ms)
+      let isPlaying = false; // Statut de lecture
+
+      // Fonction utilitaire pour formater le temps (ms -> mm:ss)
+      function formatTime(ms) {
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+      }
+
+      // Fonction utilitaire pour gérer l'affichage des sections
+      function setVisibility(loading, login, player) {
+        document.getElementById("loadingIndicator").style.display = loading
+          ? "block"
+          : "none";
+        document.getElementById("loginSection").hidden = !login;
+        document.getElementById("playerContent").hidden = !player;
+      }
+
+      async function checkLogin() {
+        setVisibility(true, false, false); // Afficher le loader
+
+        try {
+          const res = await fetch("/api/player/current");
+
+          if (res.status === 401) {
+            setVisibility(false, true, false); // Afficher login
+            clearInterval(progressInterval);
+            console.log("Utilisateur non connecté à Spotify");
+          } else {
+            setVisibility(false, false, true); // Afficher player
+            console.log("Utilisateur connecté à Spotify");
+            updatePlayer();
+            // On garde un intervalle long pour l'API, car on utilise updateProgressBar pour le rendu fluide
+            setInterval(updatePlayer, 5000);
+          }
+        } catch (err) {
+          console.error("Erreur de connexion à Spotify :", err);
+          setVisibility(false, true, false);
+        }
+      }
+
+      async function sendAction(action) {
+        try {
+          const res = await fetch(`/api/player/${action}`, { method: "POST" });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Erreur API Spotify");
+          updatePlayer();
+        } catch (err) {
+          console.error(`Erreur lors de l'action ${action}:`, err.message);
+        }
+      }
+
+      async function playTrack(uri) {
+        try {
+          const payload = { uris: [uri] };
+
+          const res = await fetch(`/api/player/play`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(
+              data.error || "Erreur lors du lancement de la piste."
+            );
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          updatePlayer();
+        } catch (err) {
+          console.error(
+            `Erreur lors du lancement de la piste ${uri}:`,
+            err.message
+          );
+        }
+      }
+
+      // Nouvelle fonction pour animer la barre de progression chaque seconde
+      function updateProgressBar() {
+        if (!isPlaying || trackDurationMs === 0) return;
+
+        // Met à jour la progression d'une seconde (1000 ms)
+        currentProgressMs += 1000;
+
+        const progressBar = document.getElementById("progressBar");
+        const timeElapsedElement = document.getElementById("timeElapsed");
+
+        // Calcul du pourcentage
+        const progressPercent = (currentProgressMs / trackDurationMs) * 100;
+
+        progressBar.value = progressPercent;
+        timeElapsedElement.textContent = formatTime(currentProgressMs);
+
+        // Si la chanson est terminée (selon notre estimation), on réinitialise et on attend la prochaine MAJ API
+        if (currentProgressMs >= trackDurationMs) {
+          clearInterval(progressInterval);
+        }
+      }
+
+      async function updatePlayer() {
+        const albumArt = document.getElementById("albumArt");
+        const trackName = document.getElementById("trackName");
+        const artistName = document.getElementById("artistName");
+        const timeTotalElement = document.getElementById("timeTotal");
+        const progressBar = document.getElementById("progressBar");
+        const timeElapsedElement = document.getElementById("timeElapsed");
+
+        try {
+          const res = await fetch("/api/player/current");
+
+          if (res.status === 401) {
+            setVisibility(false, true, false);
+            clearInterval(progressInterval);
+            return;
+          }
+
+          const data = await res.json();
+          setVisibility(false, false, true);
+
+          if (data && data.item) {
+            // Mettre à jour les informations de la piste
+            trackName.textContent = data.item.name;
+            artistName.textContent = data.item.artists
+              .map((a) => a.name)
+              .join(", ");
+            albumArt.src =
+              data.item.album.images[0]?.url ||
+              "https://placehold.co/150x150/191414/ffffff?text=Album";
+            albumArt.hidden = false;
+
+            // --- Logique de la barre de progression ---
+            currentProgressMs = data.progress_ms || 0;
+            trackDurationMs = data.item.duration_ms || 0;
+            isPlaying = data.is_playing;
+
+            timeTotalElement.textContent = formatTime(trackDurationMs);
+            timeElapsedElement.textContent = formatTime(currentProgressMs);
+
+            // Ajuster la barre de progression initiale
+            progressBar.max = 100;
+            progressBar.value = (currentProgressMs / trackDurationMs) * 100;
+
+            // Gérer l'intervalle de progression
+            if (isPlaying && !progressInterval) {
+              progressInterval = setInterval(updateProgressBar, 1000);
+            } else if (!isPlaying) {
+              clearInterval(progressInterval);
+              progressInterval = null;
+            }
+            // --- FIN Logique de la barre de progression ---
+          } else {
+            // Aucune lecture en cours
+            trackName.textContent = "Aucune lecture en cours";
+            artistName.textContent = "Lancez une chanson sur Spotify.";
+            albumArt.hidden = true;
+            timeTotalElement.textContent = "0:00";
+            timeElapsedElement.textContent = "0:00";
+            progressBar.value = 0;
+            clearInterval(progressInterval);
+            progressInterval = null;
+          }
+        } catch (err) {
+          console.error("Erreur updatePlayer:", err);
+          clearInterval(progressInterval);
+          progressInterval = null;
+          setVisibility(false, true, false);
+        }
+      }
+
+      // Vérifie la connexion dès le chargement
+      checkLogin();
+    </script>
+  </body>
+</html>
