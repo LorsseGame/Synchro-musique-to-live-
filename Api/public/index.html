@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Version 2.0 - Crop centré par défaut -->
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <title>Spotify Player</title>
+</head>
+
+<body>
+  <h1>Spotify Controller</h1>
+
+  <div class="container">
+    <div id="loadingIndicator" class="loader"></div>
+
+    <div id="loginSection" class="login-container" hidden>
+      <p style="margin-bottom: 2rem; opacity: 0.8">
+        Connectez-vous pour contrôler votre musique
+      </p>
+      <a href="/login" class="login-button">Connexion Spotify</a>
+    </div>
+
+    <div id="playerContent" hidden style="width: 100%">
+      <div class="track-info" id="trackInfo">
+        <img class="album-art" id="albumArt" src="https://placehold.co/250x250/191414/ffffff?text=Album"
+          alt="Album Art" />
+        <div class="track-name" id="trackName">Chargement...</div>
+        <div class="artist-name" id="artistName">...</div>
+
+        <div class="progress-container">
+          <span id="timeElapsed">0:00</span>
+          <progress id="progressBar" value="0" max="100"></progress>
+          <span id="timeTotal">0:00</span>
+        </div>
+      </div>
+
+      <div class="extra-controls">
+        <button onclick="playTrack('spotify:track:4KACsNJDBTlQVgW1kGIM57')">
+          <i class="fa-solid fa-music"></i> &nbsp; Lancer une piste démo
+        </button>
+        <button onclick="toggleVideoSection()">
+          <i class="fa-solid fa-video"></i> &nbsp; Analyser une vidéo
+        </button>
+      </div>
+
+      <!-- Section Analyse Vidéo -->
+      <div id="videoSection" hidden
+        style="margin-bottom: 2rem; width: 100%; border-top: 1px solid var(--glass-border); padding-top: 1rem;">
+        <h3>Analyse Vidéo & Playlist</h3>
+        <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 1rem;">
+          Uploadez une vidéo où les titres de chansons apparaissent. Définissez la zone où le texte s'affiche.
+        </p>
+
+        <div class="input-group">
+          <input type="file" id="videoInput" accept="video/*" />
+        </div>
+
+        <div style="margin: 10px 0; text-align: center; opacity: 0.7;">OU</div>
+
+        <div class="input-group">
+          <input type="text" id="videoUrl" placeholder="Coller un lien YouTube (ex: https://youtu.be/...)"
+            oninput="clearYoutubeEstimate()"
+            style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05); color: white;">
+        </div>
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+          <button onclick="estimateYoutubeTime()" id="estimateYtBtn"
+            style="flex: 1; border-radius: 10px; font-size: 0.9rem; background: rgba(255,255,255,0.1);">
+            <i class="fa-solid fa-clock"></i> Estimer le temps
+          </button>
+          <button onclick="loadYoutubePreview()" id="previewYtBtn"
+            style="flex: 1; border-radius: 10px; font-size: 0.9rem; background: rgba(76, 175, 80, 0.2);">
+            <i class="fa-solid fa-image"></i> Charger prévisualisation
+          </button>
+        </div>
+
+        <!-- Zone de Prévisualisation (Simulateur) -->
+        <div id="previewContainer"
+          style="position: relative; margin: 1rem auto; width: 100%; max-width: 800px; aspect-ratio: 16/9; border: 1px solid var(--glass-border); border-radius: 10px; overflow: hidden; background: #000;">
+          <!-- Message par défaut / Placeholder -->
+          <div id="placeholderText"
+            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #555; width: 100%;">
+            <i class="fa-solid fa-border-all" style="font-size: 2rem; margin-bottom: 10px;"></i><br>
+            Simulation 1920x1080<br>
+            <span style="font-size: 0.7rem;">(Chargez une vidéo ou cliquez sur "Charger prévisualisation")</span>
+          </div>
+
+          <!-- Vidéo (si locale) -->
+          <video id="videoPreview" style="width: 100%; height: 100%; object-fit: contain; display: none;" muted></video>
+
+          <!-- Image de prévisualisation YouTube -->
+          <img id="youtubePreview" style="width: 100%; height: 100%; object-fit: contain; display: none;"
+            alt="YouTube Preview" />
+
+          <!-- Crop Box -->
+          <div id="cropBox">
+            <div class="handle nw" data-handle="nw"></div>
+            <div class="handle ne" data-handle="ne"></div>
+            <div class="handle sw" data-handle="sw"></div>
+            <div class="handle se" data-handle="se"></div>
+          </div>
+        </div>
+        <p id="previewInfo" style="font-size: 0.8rem; color: #aaa; margin-bottom: 1rem; text-align: center;">
+          <i class="fa-solid fa-eye"></i> <span id="previewInfoText">Visualisation de la zone (Basé sur 1920x1080 par
+            défaut)</span>
+        </p>
+        <p id="estimatedTime"
+          style="font-size: 0.8rem; color: #4CAF50; margin-bottom: 1rem; text-align: center; display: none;">
+          <i class="fa-solid fa-clock"></i> <span id="estimatedTimeText"></span>
+        </p>
+
+        <div class="crop-inputs"
+          style="display: flex; gap: 10px; margin: 1rem 0; justify-content: center; flex-wrap: wrap;">
+          <div class="crop-input-wrapper">
+            <label>X (Gauche)</label>
+            <input type="number" id="cropX" value="660" oninput="updateCropBox()">
+          </div>
+          <div class="crop-input-wrapper">
+            <label>Y (Haut)</label>
+            <input type="number" id="cropY" value="440" oninput="updateCropBox()">
+          </div>
+          <div class="crop-input-wrapper">
+            <label>Largeur</label>
+            <input type="number" id="cropW" value="600" oninput="updateCropBox()">
+          </div>
+          <div class="crop-input-wrapper">
+            <label>Hauteur</label>
+            <input type="number" id="cropH" value="200" oninput="updateCropBox()">
+          </div>
+        </div>
+        <p style="font-size: 0.8rem; opacity: 0.6; margin-bottom: 1rem;">
+          <i class="fa-solid fa-circle-info"></i> Définissez la zone rouge sur le titre de la chanson.
+          <br>Pour YouTube, essayez de deviner ou utilisez des valeurs standards.
+        </p>
+
+        <button onclick="analyzeVideo()" id="analyzeBtn"
+          style="width: 100%; margin-top: 1rem; border-radius: 10px; font-size: 1rem;">
+          <i class="fa-solid fa-magnifying-glass"></i> Analyser la vidéo
+        </button>
+
+        <div id="analysisResults" hidden style="margin-top: 1.5rem; text-align: left;">
+          <h4>Titres détectés :</h4>
+          <ul id="titlesList"
+            style="list-style: none; padding: 0; margin-bottom: 1rem; max-height: 150px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;">
+            <!-- Liste des titres -->
+          </ul>
+
+          <input type="text" id="playlistName" placeholder="Nom de la playlist"
+            style="width: 100%; margin-bottom: 10px; padding: 8px; border-radius: 5px; border: none;">
+          <button onclick="createPlaylist()" id="createPlaylistBtn"
+            style="width: 100%; background: var(--spotify-green); color: white; border-radius: 10px; font-size: 1rem;">
+            <i class="fa-solid fa-plus"></i> Créer la Playlist Spotify
+          </button>
+        </div>
+
+        <div id="videoLoader" class="loader" style="display: none;"></div>
+        <p id="videoStatus" style="margin-top: 10px; font-size: 0.9rem;"></p>
+
+        <!-- Zone de progression détaillée -->
+        <div id="progressDetails"
+          style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 10px; text-align: left;">
+          <h4 style="margin-top: 0; font-size: 0.9rem;">📊 Progression de l'analyse</h4>
+          <p id="progressStatus" style="font-size: 0.85rem; margin: 5px 0; opacity: 0.8; font-style: italic;">
+            Initialisation...</p>
+          <div id="progressBar"
+            style="width: 100%; height: 20px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; margin-bottom: 10px;">
+            <div id="progressFill"
+              style="width: 0%; height: 100%; background: linear-gradient(90deg, #1db954, #1ed760); transition: width 0.3s;">
+            </div>
+          </div>
+          <p id="progressText" style="font-size: 0.85rem; margin: 5px 0;">0/0 frames (0%)</p>
+          <p id="titlesFound" style="font-size: 0.85rem; margin: 5px 0; color: #1db954;">0 titres détectés</p>
+          <div id="recentTitles"
+            style="font-size: 0.8rem; margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 5px; max-height: 100px; overflow-y: auto;">
+            <em style="opacity: 0.6;">Aucun titre pour le moment...</em>
+          </div>
+        </div>
+      </div>
+
+      <div id="playerSection" class="player-controls">
+        <button onclick="sendAction('previous')" title="Précédent">
+          <i class="fa-solid fa-backward-step"></i>
+        </button>
+        <button onclick="togglePlay()" class="play-pause" id="playPauseBtn" title="Lecture/Pause">
+          <i class="fa-solid fa-play"></i>
+        </button>
+        <button onclick="sendAction('next')" title="Suivant">
+          <i class="fa-solid fa-forward-step"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let progressInterval = null;
+    let currentProgressMs = 0;
+    let trackDurationMs = 0;
+    let isPlaying = false;
+
+    function formatTime(ms) {
+      if (!ms) return "0:00";
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+    }
+
+    function setVisibility(loading, login, player) {
+      document.getElementById("loadingIndicator").style.display = loading
+        ? "block"
+        : "none";
+      document.getElementById("loginSection").hidden = !login;
+      document.getElementById("playerContent").hidden = !player;
+    }
+
+    async function checkLogin() {
+      setVisibility(true, false, false);
+      try {
+        const res = await fetch("/api/player/current");
+        if (res.status === 401) {
+          setVisibility(false, true, false);
+          clearInterval(progressInterval);
+        } else {
+          setVisibility(false, false, true);
+          updatePlayer();
+          setInterval(updatePlayer, 5000);
+        }
+      } catch (err) {
+        console.error("Erreur connexion:", err);
+        setVisibility(false, true, false);
+      }
+    }
+
+    async function sendAction(action) {
+      try {
+        const res = await fetch(`/api/player/${action}`, { method: "POST" });
+        if (res.ok) updatePlayer();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function togglePlay() {
+      sendAction(isPlaying ? "pause" : "play");
+    }
+
+    async function playTrack(uri) {
+      try {
+        await fetch(`/api/player/play`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uris: [uri] }),
+        });
+        setTimeout(updatePlayer, 500);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function updateProgressBar() {
+      if (!isPlaying || trackDurationMs === 0) return;
+      currentProgressMs += 1000;
+      const progressBar = document.getElementById("progressBar");
+      const timeElapsedElement = document.getElementById("timeElapsed");
+      const progressPercent = (currentProgressMs / trackDurationMs) * 100;
+      progressBar.value = progressPercent;
+      timeElapsedElement.textContent = formatTime(currentProgressMs);
+      if (currentProgressMs >= trackDurationMs) clearInterval(progressInterval);
+    }
+
+    function toggleVideoSection() {
+      const section = document.getElementById("videoSection");
+      const container = document.querySelector(".container");
+      section.hidden = !section.hidden;
+
+      if (!section.hidden) {
+        container.classList.add("expanded");
+      } else {
+        container.classList.remove("expanded");
+      }
+    }
+
+    async function analyzeVideo() {
+      const videoInput = document.getElementById("videoInput");
+      const videoUrlInput = document.getElementById("videoUrl");
+      const file = videoInput.files[0];
+      const url = videoUrlInput.value.trim();
+
+      if (!file && !url) return alert("Veuillez sélectionner une vidéo ou entrer une URL YouTube.");
+
+      const formData = new FormData();
+      if (file) {
+        formData.append("video", file);
+      } else if (url) {
+        formData.append("videoUrl", url);
+      }
+
+      formData.append("x", document.getElementById("cropX").value);
+      formData.append("y", document.getElementById("cropY").value);
+      formData.append("w", document.getElementById("cropW").value);
+      formData.append("h", document.getElementById("cropH").value);
+
+      document.getElementById("analyzeBtn").disabled = true;
+      document.getElementById("videoLoader").style.display = "block";
+      document.getElementById("analysisResults").hidden = true;
+
+      // Démarrer le chronomètre
+      const startTime = Date.now();
+      let timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        document.getElementById("videoStatus").textContent =
+          (url ? "Téléchargement et analyse YouTube en cours... " : "Analyse en cours... ") +
+          `⏱️ ${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }, 1000);
+
+      // Afficher la zone de progression
+      document.getElementById("progressDetails").style.display = "block";
+
+      // Polling de la progression
+      let progressInterval = setInterval(async () => {
+        try {
+          const progressRes = await fetch("/api/video/progress");
+          const progress = await progressRes.json();
+
+          console.log("[Debug] Progression reçue:", progress);
+
+          if (progress.total > 0) {
+            const percent = Math.round((progress.processed / progress.total) * 100);
+            document.getElementById("progressFill").style.width = percent + "%";
+            document.getElementById("progressText").textContent =
+              `${progress.processed}/${progress.total} frames (${percent}%)`;
+            document.getElementById("titlesFound").textContent =
+              `${progress.titlesCount} titres détectés`;
+
+            if (progress.status) {
+              document.getElementById("progressStatus").textContent = progress.status;
+            }
+
+            if (progress.recentTitles && progress.recentTitles.length > 0) {
+              document.getElementById("recentTitles").innerHTML =
+                progress.recentTitles.map(t => `<div style="padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">${t}</div>`).join("");
+            }
+          } else {
+            console.log("[Debug] Attente démarrage analyse (total = 0)");
+          }
+        } catch (err) {
+          console.error("Erreur récupération progression:", err);
+        }
+      }, 1000);
+
+      try {
+        const res = await fetch("/api/video/analyze", {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+
+        // Arrêter le chronomètre et le polling
+        clearInterval(timerInterval);
+        clearInterval(progressInterval);
+        const totalTime = Math.floor((Date.now() - startTime) / 1000);
+        const minutes = Math.floor(totalTime / 60);
+        const seconds = totalTime % 60;
+
+        if (data.titles && data.titles.length > 0) {
+          const list = document.getElementById("titlesList");
+          list.innerHTML = "";
+          data.titles.forEach(title => {
+            const li = document.createElement("li");
+            li.textContent = title;
+            li.style.padding = "5px 0";
+            li.style.borderBottom = "1px solid rgba(255,255,255,0.1)";
+            list.appendChild(li);
+          });
+          document.getElementById("analysisResults").hidden = false;
+          document.getElementById("videoStatus").textContent =
+            `✅ ${data.titles.length} titres détectés en ${minutes}:${seconds.toString().padStart(2, '0')}`;
+        } else {
+          document.getElementById("videoStatus").textContent =
+            `⚠️ Aucun titre détecté (Temps: ${minutes}:${seconds.toString().padStart(2, '0')}). Essayez d'ajuster la zone de crop.`;
+        }
+      } catch (err) {
+        console.error(err);
+        clearInterval(timerInterval);
+        const totalTime = Math.floor((Date.now() - startTime) / 1000);
+        const minutes = Math.floor(totalTime / 60);
+        const seconds = totalTime % 60;
+        document.getElementById("videoStatus").textContent =
+          `❌ Erreur lors de l'analyse (après ${minutes}:${seconds.toString().padStart(2, '0')}).`;
+      } finally {
+        document.getElementById("analyzeBtn").disabled = false;
+        document.getElementById("videoLoader").style.display = "none";
+      }
+    }
+
+    async function createPlaylist() {
+      const titles = Array.from(document.querySelectorAll("#titlesList li")).map(li => li.textContent);
+      const playlistName = document.getElementById("playlistName").value;
+
+      if (titles.length === 0) return;
+
+      document.getElementById("createPlaylistBtn").disabled = true;
+      document.getElementById("createPlaylistBtn").textContent = "Création en cours...";
+
+      try {
+        const res = await fetch("/api/playlist/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ titles, playlistName })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          alert(`Playlist créée avec succès ! ${data.addedCount} titres ajoutés.`);
+          window.open(data.playlistUrl, "_blank");
+        } else {
+          alert("Erreur: " + (data.error || "Inconnue"));
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Erreur lors de la création de la playlist.");
+      } finally {
+        document.getElementById("createPlaylistBtn").disabled = false;
+        document.getElementById("createPlaylistBtn").innerHTML = '<i class="fa-solid fa-plus"></i> Créer la Playlist Spotify';
+      }
+    }
+
+    function clearYoutubeEstimate() {
+      document.getElementById("estimatedTime").style.display = "none";
+    }
+
+    async function estimateYoutubeTime() {
+      const url = document.getElementById("videoUrl").value.trim();
+      if (!url) return alert("Veuillez entrer une URL YouTube.");
+
+      const btn = document.getElementById("estimateYtBtn");
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Récupération...';
+
+      try {
+        const res = await fetch("/api/video/youtube-info", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+
+        if (data.duration) {
+          const durationSeconds = data.duration;
+
+          // Calcul adaptatif
+          let frameInterval, maxFrames;
+          if (durationSeconds > 3600) {
+            frameInterval = 120;
+            maxFrames = 100;
+          } else if (durationSeconds > 600) {
+            frameInterval = 30;
+            maxFrames = 50;
+          } else {
+            frameInterval = 10;
+            maxFrames = 30;
+          }
+
+          const calculatedFrames = Math.min(Math.ceil(durationSeconds / frameInterval), maxFrames);
+          // Ajouter le temps de téléchargement (~30s pour YouTube)
+          const estimatedSeconds = calculatedFrames * 2 + 30;
+          const estMinutes = Math.floor(estimatedSeconds / 60);
+          const estSeconds = estimatedSeconds % 60;
+
+          const vidMinutes = Math.floor(durationSeconds / 60);
+          const vidSeconds = Math.floor(durationSeconds % 60);
+
+          document.getElementById("estimatedTimeText").textContent =
+            `Vidéo: ${vidMinutes}:${vidSeconds.toString().padStart(2, '0')} | Temps estimé : ~${estMinutes}:${estSeconds.toString().padStart(2, '0')} (${calculatedFrames} frames)`;
+          document.getElementById("estimatedTime").style.display = "block";
+        } else {
+          alert("Impossible de récupérer les informations de la vidéo.");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Erreur lors de la récupération des informations YouTube.");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-clock"></i> Estimer le temps d\'analyse';
+      }
+    }
+
+    async function loadYoutubePreview() {
+      const url = document.getElementById("videoUrl").value.trim();
+      if (!url) return alert("Veuillez entrer une URL YouTube.");
+
+      const btn = document.getElementById("previewYtBtn");
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Chargement...';
+
+      try {
+        const res = await fetch("/api/video/get-thumbnail", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url, timestamp: "00:05:00" })
+        });
+
+        if (!res.ok) throw new Error("Erreur lors de l'extraction de la prévisualisation");
+
+        const blob = await res.blob();
+        const imageUrl = URL.createObjectURL(blob);
+
+        const youtubePreview = document.getElementById("youtubePreview");
+        const videoPreview = document.getElementById("videoPreview");
+        const placeholderText = document.getElementById("placeholderText");
+
+        // Afficher l'image de prévisualisation
+        youtubePreview.src = imageUrl;
+        youtubePreview.style.display = "block";
+        videoPreview.style.display = "none";
+        placeholderText.style.display = "none";
+
+        // Mettre à jour le texte d'info
+        document.getElementById("previewInfoText").textContent = "Prévisualisation YouTube chargée (1920x1080)";
+
+        // Mettre à jour le crop box
+        updateCropBox();
+
+        alert("✅ Prévisualisation chargée ! Vous pouvez maintenant ajuster précisément la zone de crop.");
+      } catch (err) {
+        console.error(err);
+        alert("❌ Erreur lors du chargement de la prévisualisation. Vérifiez l'URL YouTube.");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-image"></i> Charger prévisualisation';
+      }
+    }
+
+    // Initialisation - Forcer les valeurs par défaut
+    window.addEventListener('load', function () {
+      setTimeout(() => {
+        document.getElementById("cropX").value = 660;
+        document.getElementById("cropY").value = 440;
+        document.getElementById("cropW").value = 600;
+        document.getElementById("cropH").value = 200;
+        console.log("✅ Valeurs de crop initialisées:", {
+          x: document.getElementById("cropX").value,
+          y: document.getElementById("cropY").value,
+          w: document.getElementById("cropW").value,
+          h: document.getElementById("cropH").value
+        });
+        updateCropBox();
+      }, 100);
+    });
+
+    // Gestion de l'aperçu vidéo local
+    document.getElementById("videoInput").addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      const videoPreview = document.getElementById("videoPreview");
+      const youtubePreview = document.getElementById("youtubePreview");
+      const placeholderText = document.getElementById("placeholderText");
+
+      if (file) {
+        const fileURL = URL.createObjectURL(file);
+        videoPreview.src = fileURL;
+        videoPreview.style.display = "block";
+        youtubePreview.style.display = "none";
+        placeholderText.style.display = "none";
+
+        // Mettre à jour le texte d'info
+        document.getElementById("previewInfoText").textContent = "Prévisualisation de la vidéo locale";
+
+        videoPreview.onloadedmetadata = function () {
+          updateCropBox();
+
+          // Calculer l'estimation du temps d'analyse
+          const durationSeconds = Math.floor(videoPreview.duration);
+
+          // Calcul adaptatif selon la durée
+          let frameInterval, maxFrames;
+          if (durationSeconds > 3600) { // Plus d'1 heure
+            frameInterval = 120; // 1 frame/2min
+            maxFrames = 100;
+          } else if (durationSeconds > 600) { // Plus de 10 min
+            frameInterval = 30; // 1 frame/30s
+            maxFrames = 50;
+          } else {
+            frameInterval = 10; // 1 frame/10s
+            maxFrames = 30;
+          }
+
+          const calculatedFrames = Math.min(Math.ceil(durationSeconds / frameInterval), maxFrames);
+          // Estimation : ~2 secondes par frame pour l'OCR
+          const estimatedSeconds = calculatedFrames * 2;
+          const estMinutes = Math.floor(estimatedSeconds / 60);
+          const estSeconds = estimatedSeconds % 60;
+
+          document.getElementById("estimatedTimeText").textContent =
+            `Temps estimé : ~${estMinutes}:${estSeconds.toString().padStart(2, '0')} (${calculatedFrames} frames)`;
+          document.getElementById("estimatedTime").style.display = "block";
+        };
+      } else {
+        videoPreview.style.display = "none";
+        youtubePreview.style.display = "none";
+        videoPreview.src = "";
+        placeholderText.style.display = "block";
+        document.getElementById("estimatedTime").style.display = "none";
+        document.getElementById("previewInfoText").textContent = "Visualisation de la zone (Basé sur 1920x1080 par défaut)";
+        updateCropBox(); // Retour au mode simulation
+      }
+    });
+
+    function updateCropBox() {
+      const video = document.getElementById("videoPreview");
+      const youtubePreview = document.getElementById("youtubePreview");
+      const cropBox = document.getElementById("cropBox");
+      const container = document.getElementById("previewContainer");
+
+      // Dimensions de référence
+      let refWidth = 1920;
+      let refHeight = 1080;
+
+      // Si une vidéo locale est chargée, on utilise ses dimensions réelles
+      if (video.style.display !== "none" && video.videoWidth) {
+        refWidth = video.videoWidth;
+        refHeight = video.videoHeight;
+      }
+      // Si c'est une prévisualisation YouTube, on garde 1920x1080 (dimension normalisée)
+      else if (youtubePreview.style.display !== "none") {
+        refWidth = 1920;
+        refHeight = 1080;
+      }
+
+      // Récupérer les valeurs inputs
+      const realX = parseInt(document.getElementById("cropX").value) || 0;
+      const realY = parseInt(document.getElementById("cropY").value) || 0;
+      const realW = parseInt(document.getElementById("cropW").value) || 0;
+      const realH = parseInt(document.getElementById("cropH").value) || 0;
+
+      // Calculer le ratio d'affichage (Container Width / Reference Width)
+      // Le container a un aspect-ratio 16/9, donc on se base sur la largeur
+      const scale = container.clientWidth / refWidth;
+
+      // Appliquer le ratio
+      cropBox.style.display = "block";
+      cropBox.style.left = (realX * scale) + "px";
+      cropBox.style.top = (realY * scale) + "px";
+      cropBox.style.width = (realW * scale) + "px";
+      cropBox.style.height = (realH * scale) + "px";
+
+      // Feedback visuel si hors zone
+      if (realX + realW > refWidth || realY + realH > refHeight) {
+        cropBox.style.borderColor = "orange";
+      } else {
+        cropBox.style.borderColor = "#e74c3c";
+      }
+    }
+
+    // Mettre à jour lors du redimensionnement de la fenêtre
+    window.addEventListener('resize', updateCropBox);
+
+    // === Gestion Drag & Resize ===
+    const cropBox = document.getElementById("cropBox");
+    const previewContainer = document.getElementById("previewContainer");
+    let isDragging = false;
+    let isResizing = false;
+    let currentHandle = null;
+    let startX, startY, startLeft, startTop, startWidth, startHeight;
+
+    // Mouse Down sur la boîte (Drag) ou les poignées (Resize)
+    cropBox.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.target.classList.contains("handle")) {
+        isResizing = true;
+        currentHandle = e.target.dataset.handle;
+      } else {
+        isDragging = true;
+        cropBox.style.cursor = "grabbing";
+      }
+
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = cropBox.offsetLeft;
+      startTop = cropBox.offsetTop;
+      startWidth = cropBox.offsetWidth;
+      startHeight = cropBox.offsetHeight;
+
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    });
+
+    function onMouseMove(e) {
+      e.preventDefault();
+
+      // Calcul du delta de mouvement
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      // Récupérer le ratio actuel (Scale) pour convertir en coordonnées réelles
+      const video = document.getElementById("videoPreview");
+      const youtubePreview = document.getElementById("youtubePreview");
+      let refWidth = 1920;
+      if (video.style.display !== "none" && video.videoWidth) {
+        refWidth = video.videoWidth;
+      } else if (youtubePreview.style.display !== "none") {
+        refWidth = 1920; // YouTube preview is normalized to 1920x1080
+      }
+      const scale = previewContainer.clientWidth / refWidth;
+
+      if (isDragging) {
+        let newLeft = startLeft + dx;
+        let newTop = startTop + dy;
+
+        // Contraintes (ne pas sortir du conteneur)
+        newLeft = Math.max(0, Math.min(newLeft, previewContainer.clientWidth - startWidth));
+        newTop = Math.max(0, Math.min(newTop, previewContainer.clientHeight - startHeight));
+
+        // Mise à jour visuelle
+        cropBox.style.left = newLeft + "px";
+        cropBox.style.top = newTop + "px";
+
+        // Mise à jour des inputs (conversion inverse)
+        document.getElementById("cropX").value = Math.round(newLeft / scale);
+        document.getElementById("cropY").value = Math.round(newTop / scale);
+      }
+      else if (isResizing) {
+        let newW = startWidth;
+        let newH = startHeight;
+        let newX = startLeft;
+        let newY = startTop;
+
+        if (currentHandle.includes("e")) newW = startWidth + dx;
+        if (currentHandle.includes("w")) {
+          newW = startWidth - dx;
+          newX = startLeft + dx;
+        }
+        if (currentHandle.includes("s")) newH = startHeight + dy;
+        if (currentHandle.includes("n")) {
+          newH = startHeight - dy;
+          newY = startTop + dy;
+        }
+
+        // Contraintes minimales
+        if (newW < 20) newW = 20;
+        if (newH < 20) newH = 20;
+
+        // Appliquer les changements visuels
+        cropBox.style.width = newW + "px";
+        cropBox.style.height = newH + "px";
+        cropBox.style.left = newX + "px";
+        cropBox.style.top = newY + "px";
+
+        // Mise à jour des inputs
+        document.getElementById("cropW").value = Math.round(newW / scale);
+        document.getElementById("cropH").value = Math.round(newH / scale);
+        document.getElementById("cropX").value = Math.round(newX / scale);
+        document.getElementById("cropY").value = Math.round(newY / scale);
+      }
+    }
+
+    function onMouseUp() {
+      isDragging = false;
+      isResizing = false;
+      currentHandle = null;
+      cropBox.style.cursor = "move"; // Retour au curseur par défaut
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    }
+
+    async function updatePlayer() {
+      try {
+        const res = await fetch("/api/player/current");
+        if (res.status === 401) {
+          setVisibility(false, true, false);
+          return;
+        }
+        const data = await res.json();
+
+        const trackName = document.getElementById("trackName");
+        const artistName = document.getElementById("artistName");
+        const albumArt = document.getElementById("albumArt");
+        const playPauseBtn = document.getElementById("playPauseBtn");
+
+        if (data && data.item) {
+          trackName.textContent = data.item.name;
+          artistName.textContent = data.item.artists.map((a) => a.name).join(", ");
+          albumArt.src = data.item.album.images[0]?.url || "";
+
+          currentProgressMs = data.progress_ms || 0;
+          trackDurationMs = data.item.duration_ms || 0;
+          isPlaying = data.is_playing;
+
+          document.getElementById("timeTotal").textContent = formatTime(trackDurationMs);
+          document.getElementById("timeElapsed").textContent = formatTime(currentProgressMs);
+          document.getElementById("progressBar").value = (currentProgressMs / trackDurationMs) * 100;
+
+          // Update Play/Pause Icon
+          playPauseBtn.innerHTML = isPlaying ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
+
+          if (isPlaying && !progressInterval) {
+            progressInterval = setInterval(updateProgressBar, 1000);
+          } else if (!isPlaying) {
+            clearInterval(progressInterval);
+            progressInterval = null;
+          }
+        } else {
+          trackName.textContent = "Aucune lecture";
+          artistName.textContent = "Lancez Spotify sur un appareil";
+          playPauseBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    checkLogin();
+  </script>
+</body>
+
+</html>

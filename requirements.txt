@@ -1,0 +1,9 @@
+# PyTorch GPU CUDA 12.6
+torch==2.9.1+cu126
+torchvision==0.24.1+cu126
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+python-doctr>=0.8.1
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.26.0
